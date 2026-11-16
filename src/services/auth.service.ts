@@ -108,3 +108,16 @@ export const registerUser = async (data: RegisterInput) => {
 // Health checks: health.routes.ts checks the database on every health request. Separate a lightweight liveness check from a readiness check that verifies dependencies.
 // Observability and tests: Add request/error metrics, database latency and pool monitoring, and tests for registration validation, duplicate handling, and concurrent inserts. There are no test scripts in package.json, and a build alone won’t establish capacity; use load tests against a production-like database and deployment.
 // Email configuration: email.utils.ts reads SMTP configuration when the module loads, so missing email settings can prevent the whole app from starting. Decide explicitly whether that should be a startup requirement or whether email setup should be isolated from unrelated endpoints.
+
+// Redis Rate Limiter
+// Multi Device Session Management
+// Refresh Token Rotation
+// Check Window Functions, Aggregate Queries, and Indexes for Performance
+// Views and materialized views.
+// Microservices and Event-Driven Architecture
+// Retries, timeouts, circuit breakers
+// Message queues. Kafka fundamentals. RabbitMQ fundamentals.
+// Performance	Caching, batching, compression
+// WebSockets, Socket.IO, SSE
+// Load Balancing, Clustering, Horizontal Scaling
+// CSRF, SSRF, XSS, SQL Injection, NoSQL Injection, Command Injection, Path Traversal, Open Redirects, Clickjacking, Security Headers, CORS Misconfigurations, Insecure Deserialization, Insecure Direct Object References (IDOR), Broken Authentication and Session Management, Insufficient Logging and Monitoring
