@@ -92,3 +92,19 @@ export const registerUser = async (data: RegisterInput) => {
             : "Account created, but verification email could not be sent. Please request another email.",
     };
 };
+
+
+// Important consistency and security improvements
+// Email length differs: user.validation.ts caps email at 100 characters, while the database column in user.schema.ts allows 254. Align these limits. Also, the current validation chain trims after validating the email, so whitespace-wrapped input may be rejected before trimming.
+// Password byte length: bcrypt has a 72-byte input limit; a 72-character limit is not always 72 bytes for Unicode passwords. Define and enforce a clear byte-length policy in validation. Keep password hashing deliberately expensive, but benchmark its cost and protect it with rate limiting.
+// Config consistency: app.ts uses CLIENT_URI, while auth.service.ts uses CLIENT_URL. Standardize these and validate required configuration at startup. Review the CORS behavior when the allowed origin is missing, especially because credentials are enabled.
+// JWT verification: token.utils.ts casts verified JWT data to TokenPayload without checking its runtime shape. Validate required claims, and configure the expected algorithm, issuer, and audience.
+// Logging: app.ts uses Morgan’s dev format unconditionally. Use production-appropriate structured logs and avoid logging sensitive query parameters or tokens.
+// Request limits: Set an explicit, suitably small JSON body limit in app.ts. The URL-encoded parser may not be needed for a JSON API; if retained, limit its input too.
+// Secrets: A .env file is present. I did not inspect it. Ensure it is ignored by version control; if secrets were ever committed, rotate them.
+// Scaling and resilience work
+// Database pool sizing: database.ts sets max: 10 per process. That may be reasonable, but total connections multiply across instances. Measure database limits and consider a connection pooler before simply increasing the pool.
+// Graceful shutdown: server.ts doesn’t retain the HTTP server handle or close the database pool on shutdown. Add graceful shutdown so deploys and restarts can finish in-flight requests.
+// Health checks: health.routes.ts checks the database on every health request. Separate a lightweight liveness check from a readiness check that verifies dependencies.
+// Observability and tests: Add request/error metrics, database latency and pool monitoring, and tests for registration validation, duplicate handling, and concurrent inserts. There are no test scripts in package.json, and a build alone won’t establish capacity; use load tests against a production-like database and deployment.
+// Email configuration: email.utils.ts reads SMTP configuration when the module loads, so missing email settings can prevent the whole app from starting. Decide explicitly whether that should be a startup requirement or whether email setup should be isolated from unrelated endpoints.
