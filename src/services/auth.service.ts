@@ -2,8 +2,15 @@ import { hashPassword } from "../utils/password.utils.js";
 import { generateVerificationToken } from "../utils/token.utils.js";
 import sendEmail from "../utils/email.utils.js";
 
-import { createUser, findRegistrationConflicts, } from "../repositories/user.repository.js";
+import {
+    createUser,
+    findRegistrationConflicts,
+    findUserByEmail,
+    updateVerificationToken,
+    verifyUserEmailByTokenHash
+} from "../repositories/user.repository.js";
 import { type RegisterInput } from "../types/auth.types.js";
+import { createHash } from "crypto";
 
 const isUniqueViolation = (error: unknown): boolean =>
     typeof error === "object" &&
@@ -39,9 +46,9 @@ export const registerUser = async (data: RegisterInput) => {
     // 4. Create user
     try {
         user = await createUser({
-            email,
+            email: normalizedEmail,
             passwordHash,
-            userName,
+            userName: normalizedUsername,
             displayName,
             isEmailVerified: false,
             emailVerificationTokenHash: tokenHash,
@@ -62,14 +69,15 @@ export const registerUser = async (data: RegisterInput) => {
     let emailSent = true;
 
     try {
-        const verificationUrl = `${process.env.CLIENT_URI}/verify-email?token=${token}`;
+        const verificationUrl = new URL("/verify-email", process.env.CLIENT_URI);
+        verificationUrl.searchParams.set("token", token);
         await sendEmail({
-            to: email,
-            subject: "Verify your Zuno account",
+            to: normalizedEmail,
+            subject: "Verify your Zeno account",
             html: `
                 <h2>Welcome to Zeno!</h2>
                 <p>Please verify your email address by clicking below.</p>
-                <a href="${verificationUrl}">Verify Email</a>
+                <a href="${verificationUrl.toString()}">Verify Email</a>
                 <p>This link expires in 30 minutes.</p>
             `,
         });
@@ -92,6 +100,68 @@ export const registerUser = async (data: RegisterInput) => {
             : "Account created, but verification email could not be sent. Please request another email.",
     };
 };
+
+export const verifyEmailToken = async (token: string) => {
+    // 1. Hash the received raw token
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+
+    // 2. Verify user and consume token atomically
+    const user = await verifyUserEmailByTokenHash(tokenHash);
+
+    if (!user) {
+        throw Object.assign(new Error("Invalid or expired verification link"), { statusCode: 400 },);
+    }
+
+    // 3. Return safe user details
+    return { user, message: "Email verified successfully." };
+}
+
+export const resendVerificationEmail = async (email: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // 1. Find user
+    const user = await findUserByEmail(normalizedEmail);
+
+    // 2. If user doesn't exist or is already verified, return a generic message
+    if (!user || user.isEmailVerified) {
+        return { message: "If an unverified account exists with this email, a verification link will be sent." };
+    }
+
+    // 3. Generate new verification token
+    const { token, tokenHash } = generateVerificationToken();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    // 4. Update token in database
+    const updatedUser = await updateVerificationToken(
+        user.id,
+        tokenHash,
+        expiresAt,
+    );
+
+    if (!updatedUser) {
+        return { message: "If an unverified account exists with this email, a verification link will be sent." };
+    }
+
+    // 5. Send verification email
+    try {
+        const verificationUrl = new URL("/verify-email", process.env.CLIENT_URI);
+        verificationUrl.searchParams.set("token", token);
+        await sendEmail({
+            to: updatedUser.email,
+            subject: "Verify your Zeno account",
+            html: `
+                <h2>Verify your Zeno account</h2>
+                <p>Please click the link below to verify your email address.</p>
+                <a href="${verificationUrl.toString()}">Verify Email</a>
+                <p>This link expires in 30 minutes.</p>
+            `,
+        });
+    } catch (error) {
+        console.error("Resend verification email failed:", error);
+        throw Object.assign(new Error("Unable to send verification email. Please try again later."), { statusCode: 500 });
+    }
+    return { message: "Verification email sent successfully." };
+}
 
 
 

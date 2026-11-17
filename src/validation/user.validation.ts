@@ -1,8 +1,12 @@
 import { z } from "zod";
 
+
+export const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(100));
+
+
 // ============= Register User Schema =============
 export const registerUserSchema = z.object({
-    email: z.string().trim().toLowerCase().pipe(z.email().max(100)),
+    email: emailSchema,
     password: z.string().min(8).max(20).regex(
         /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/,
         "Password must contain uppercase, lowercase, number and special character"),
@@ -12,9 +16,10 @@ export const registerUserSchema = z.object({
 
 // ============= Login User Schema =============
 export const loginUserSchema = z.object({
-    email: z.string().trim().toLowerCase().pipe(z.email().max(100)),
+    email: emailSchema,
     password: z.string().min(1).max(20),
 }).strict();
 
-export type RegisterUserInput = z.infer<typeof registerUserSchema>;
-export type LoginUserInput = z.infer<typeof loginUserSchema>;
+// ============= Verify Email Schema =============
+export const verifyEmailSchema = z.object({ token: z.string().min(1, "Verification token is required") }).strict();
+export const resendVerificationEmailSchema = z.object({ email: emailSchema }).strict();
