@@ -7,6 +7,6 @@ import authLimiter from "../middlewares/rateLimiter.middleware.js";
 const router = Router();
 
 // POST /api/auth/register
-router.post("/register", validate(registerUserSchema), authLimiter, registerController,);
+router.post("/register", authLimiter, validate(registerUserSchema), registerController);
 
 export default router;

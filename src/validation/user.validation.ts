@@ -2,8 +2,8 @@ import { z } from "zod";
 
 // ============= Register User Schema =============
 export const registerUserSchema = z.object({
-    email: z.email().max(100).trim().toLowerCase(),
-    password: z.string().min(8).max(72).regex(
+    email: z.string().trim().toLowerCase().pipe(z.email().max(100)),
+    password: z.string().min(8).max(20).regex(
         /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/,
         "Password must contain uppercase, lowercase, number and special character"),
     userName: z.string().trim().min(1, "User name is required").max(30),
@@ -12,8 +12,8 @@ export const registerUserSchema = z.object({
 
 // ============= Login User Schema =============
 export const loginUserSchema = z.object({
-    email: z.email().max(100).trim().toLowerCase(),
-    password: z.string().min(1).max(72),
+    email: z.string().trim().toLowerCase().pipe(z.email().max(100)),
+    password: z.string().min(1).max(20),
 }).strict();
 
 export type RegisterUserInput = z.infer<typeof registerUserSchema>;
