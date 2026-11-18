@@ -1,16 +1,27 @@
-import { hashPassword } from "../utils/password.utils.js";
-import { generateVerificationToken } from "../utils/token.utils.js";
-import sendEmail from "../utils/email.utils.js";
+import { createHash } from "crypto";
+import { type RegisterInput } from "../types/auth.types.js";
 
+import { comparePassword, hashPassword } from "../utils/password.utils.js";
+
+import sendEmail from "../utils/email.utils.js";
 import {
+    generateAccessToken,
+    generateRefreshToken,
+    generateVerificationToken,
+    verifyRefreshToken
+} from "../utils/token.utils.js";
+import {
+    completeLogin,
     createUser,
     findRegistrationConflicts,
     findUserByEmail,
+    handleFailedLogin,
+    revokeRefreshToken,
+    rotateRefreshTokenHash,
+    saveRefreshTokenHash,
     updateVerificationToken,
     verifyUserEmailByTokenHash
 } from "../repositories/user.repository.js";
-import { type RegisterInput } from "../types/auth.types.js";
-import { createHash } from "crypto";
 
 const isUniqueViolation = (error: unknown): boolean =>
     typeof error === "object" &&
@@ -163,7 +174,107 @@ export const resendVerificationEmail = async (email: string) => {
     return { message: "Verification email sent successfully." };
 }
 
+export const loginUser = async (email: string, password: string) => {
+    // 1. Find user by email
+    const user = await findUserByEmail(email);
+    if (!user) {
+        throw Object.assign(new Error("Invalid email or password"), { statusCode: 401 });
+    }
 
+    // 2. Check account status
+    if (!user.isActive) {
+        throw Object.assign(new Error("Your account is disabled"), { statusCode: 403 });
+    }
+
+    // 3. Check account lock
+    if (user.lockUntil && user.lockUntil > new Date()) {
+        throw Object.assign(new Error("Account temporarily locked. Try again later."), { statusCode: 423 },);
+    }
+
+    // 4. Check Credentials
+    const isPasswordValid = await comparePassword(password, user.passwordHash);
+
+    // 5. Handle failed login
+    if (!isPasswordValid) {
+        await handleFailedLogin(user.id);
+        throw Object.assign(new Error("Invalid email or password"), { statusCode: 401 });
+    }
+
+    // 6. Check email verification status
+    if (!user.isEmailVerified) {
+        throw Object.assign(new Error("Please verify your email before logging in"), { statusCode: 403 });
+    }
+
+    // 7. Reset attempts and update last login
+    await completeLogin(user.id);
+
+    // 8. Generate Tokens
+    const accessToken = generateAccessToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
+    const refreshTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+    await saveRefreshTokenHash(user.id, refreshTokenHash);
+
+    // 9. Return safe user details and tokens
+    return {
+        user: {
+            id: user.id,
+            email: user.email,
+            userName: user.userName,
+            displayName: user.displayName,
+        },
+        accessToken,
+        refreshToken,
+        message: "Login successful",
+    };
+}
+
+export const refreshUserToken = async (refreshToken: string) => {
+    // 1. Verify refresh token
+    let payload = verifyRefreshToken(refreshToken);
+
+    // 2. Extract user ID
+    const userId = payload.userId;
+    if (!userId) {
+        throw Object.assign(new Error("Invalid refresh token"), { statusCode: 401 });
+    }
+
+    // 3. Hash current refresh token
+    const currentTokenHash = createHash("sha256").update(refreshToken).digest("hex");
+
+    // 4. Generate new tokens
+    const newAccessToken = generateAccessToken(userId);
+    const newRefreshToken = generateRefreshToken(userId);
+
+    // 5. Hash new refresh token
+    const newTokenHash = createHash("sha256").update(newRefreshToken).digest("hex");
+
+    // 6. Atomically rotate stored refresh token
+    const user = await rotateRefreshTokenHash(userId, currentTokenHash, newTokenHash);
+
+    if (!user) {
+        throw Object.assign(new Error("Invalid or expired refresh token"), { statusCode: 401 });
+    }
+
+    // 7. Return new tokens and safe user details
+    return {
+        user,
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        message: "Token refreshed successfully",
+    };
+};
+
+export const logoutUser = async (refreshToken: string) => {
+    if (refreshToken) {
+        const tokenHash = createHash("sha256")
+            .update(refreshToken)
+            .digest("hex");
+
+        await revokeRefreshToken(tokenHash);
+    }
+
+    return { message: "Logged out successfully" };
+}
 
 // Rate limit and hash cost: The registration limiter now runs before validation, which is good. It uses an in-memory store, so multiple server instances will need a shared store. SALT_ROUNDS = 10 is a cost setting, not a length limit; benchmark it under realistic load before deciding whether to change it.
 // JWT verification: token.utils.ts casts verified JWT data to TokenPayload without checking its runtime shape. Validate required claims, and configure the expected algorithm, issuer, and audience.

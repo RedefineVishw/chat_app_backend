@@ -54,7 +54,15 @@ export const findUserByEmail = async (email: string) => {
     const normalizedEmail = email.trim().toLowerCase();
 
     const [user] = await db.select({
-        id: users.id, email: users.email, isEmailVerified: users.isEmailVerified
+        id: users.id,
+        email: users.email,
+        passwordHash: users.passwordHash,
+        userName: users.userName,
+        displayName: users.displayName,
+        isEmailVerified: users.isEmailVerified,
+        isActive: users.isActive,
+        loginAttempts: users.loginAttempts,
+        lockUntil: users.lockUntil,
     }).
         from(users).where(
             and(sql`lower(${users.email}) = ${normalizedEmail}`, isNull(users.deletedAt),),
@@ -76,7 +84,100 @@ export const updateVerificationToken = async (userId: string, tokenHash: string,
     return user;
 };
 
+// Failed login attempt handling: Increment login attempts and lock account if necessary
+export const handleFailedLogin = async (userId: string) => {
+    const now = new Date();
+    const lockExpiry = new Date(now.getTime() + 15 * 60 * 1000);
 
+    const [user] = await db.update(users)
+        .set({
+            loginAttempts: sql`CASE WHEN ${users.lockUntil} IS NOT NULL
+                         AND ${users.lockUntil} <= ${now}
+                    THEN 1
+                    ELSE ${users.loginAttempts} + 1
+                END
+            `,
+            lockUntil: sql`
+                CASE WHEN ( CASE WHEN ${users.lockUntil} IS NOT NULL
+                                 AND ${users.lockUntil} <= ${now}
+                            THEN 1
+                            ELSE ${users.loginAttempts} + 1
+                        END
+                    ) >= 5
+                    THEN ${lockExpiry}
+                    ELSE NULL
+                END
+            `,
+            updatedAt: now,
+        })
+        .where(and(eq(users.id, userId), isNull(users.deletedAt),
+            or(isNull(users.lockUntil), sql`${users.lockUntil} <= ${now}`,),
+        ))
+        .returning({ loginAttempts: users.loginAttempts, lockUntil: users.lockUntil });
+
+    return user;
+};
+
+export const completeLogin = async (userId: string) => {
+    const now = new Date();
+
+    const [user] = await db.update(users).set({
+        loginAttempts: 0,
+        lockUntil: null,
+        lastLogin: now,
+        updatedAt: now,
+    })
+        .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+        .returning({ id: users.id, lastLogin: users.lastLogin });
+
+    return user;
+};
+
+export const saveRefreshTokenHash = async (userId: string, tokenHash: string) => {
+    const [user] = await db.update(users)
+        .set({ refreshTokenHash: tokenHash, updatedAt: new Date() })
+        .where(and(
+            eq(users.id, userId),
+            eq(users.isActive, true),
+            eq(users.isEmailVerified, true),
+            isNull(users.deletedAt),
+        ))
+        .returning({ id: users.id });
+
+    return user;
+};
+
+export const rotateRefreshTokenHash = async (
+    userId: string,
+    currentTokenHash: string,
+    newTokenHash: string,
+) => {
+    const [user] = await db.update(users)
+        .set({ refreshTokenHash: newTokenHash, updatedAt: new Date() })
+        .where(and(
+            eq(users.id, userId),
+            eq(users.refreshTokenHash, currentTokenHash),
+            eq(users.isActive, true),
+            eq(users.isEmailVerified, true),
+            isNull(users.deletedAt),
+        ))
+        .returning({
+            id: users.id,
+            email: users.email,
+            userName: users.userName,
+            displayName: users.displayName,
+        });
+
+    return user;
+};
+
+export const revokeRefreshToken = async (tokenHash: string) => {
+    const [user] = await db.update(users)
+        .set({ refreshTokenHash: null, updatedAt: new Date(), })
+        .where(eq(users.refreshTokenHash, tokenHash))
+        .returning({ id: users.id });
+    return user;
+};
 
 export const findUserByUsername = async (userName: string) => {
     const normalizedUsername = userName.trim().toLowerCase();

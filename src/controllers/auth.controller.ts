@@ -1,7 +1,14 @@
 import type { Request, Response, NextFunction } from "express";
-import { registerUser, verifyEmailToken, resendVerificationEmail } from "../services/auth.service.js";
+import {
+    registerUser,
+    verifyEmailToken,
+    resendVerificationEmail,
+    loginUser,
+    refreshUserToken,
+    logoutUser
+} from "../services/auth.service.js";
+import { clearAuthCookies, setAuthCookies } from "../utils/cookies.utils.js";
 
-// =============== Registration Controller ===============
 export const registerController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const result = await registerUser(req.body);
@@ -15,7 +22,6 @@ export const registerController = async (req: Request, res: Response, next: Next
         next(error);
     }
 };
-
 
 export const verifyEmailController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -36,6 +42,55 @@ export const resendVerificationEmailController = async (req: Request, res: Respo
         res.status(200).json({
             success: true,
             message: result.message,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export const LoginController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const result = await loginUser(req.body.email, req.body.password);
+        setAuthCookies(res, result.accessToken, result.refreshToken);
+        res.status(200).json({
+            success: true,
+            message: result.message,
+            user: result.user,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export const RefreshTokenController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const refreshToken = req.cookies?.refreshToken;
+        if (!refreshToken) {
+            res.status(401).json({ success: false, message: "Refresh token missing" });
+            return;
+        }
+        const result = await refreshUserToken(req.cookies.refreshToken);
+        setAuthCookies(res, result.accessToken, result.refreshToken);
+        res.status(200).json({
+            success: true,
+            message: "Token refreshed successfully",
+            user: result.user,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+}
+
+export const LogoutController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const refreshToken = req.cookies?.refreshToken;
+        await logoutUser(refreshToken);
+        clearAuthCookies(res);
+
+        res.status(200).json({
+            success: true,
+            message: "Logged out successfully",
         });
     } catch (error) {
         next(error);

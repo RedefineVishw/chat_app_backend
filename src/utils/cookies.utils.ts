@@ -25,8 +25,17 @@ export const setRefreshTokenCookie = (
 };
 
 export const clearAuthCookies = (res: Response): void => {
-  res.clearCookie("accessToken");
-  res.clearCookie("refreshToken");
+  res.clearCookie("accessToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
 };
 
 export const setTwoFactorTokenCookie = (res: Response, token: string): void => {
@@ -44,4 +53,13 @@ export const clearTwoFactorTokenCookie = (res: Response): void => {
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
   });
+};
+
+export const setAuthCookies = (
+  res: Response,
+  accessToken: string,
+  refreshToken: string,
+): void => {
+  setAccessTokenCookie(res, accessToken);
+  setRefreshTokenCookie(res, refreshToken);
 };
