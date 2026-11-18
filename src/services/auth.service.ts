@@ -11,13 +11,19 @@ import {
     verifyRefreshToken
 } from "../utils/token.utils.js";
 import {
+    changePasswordByUserId,
+    clearPasswordResetToken,
     completeLogin,
     createUser,
     findRegistrationConflicts,
     findUserByEmail,
+    findUserForPasswordChange,
+    findUserProfileById,
     handleFailedLogin,
+    resetPasswordByTokenHash,
     revokeRefreshToken,
     rotateRefreshTokenHash,
+    savePasswordResetToken,
     saveRefreshTokenHash,
     updateVerificationToken,
     verifyUserEmailByTokenHash
@@ -276,28 +282,122 @@ export const logoutUser = async (refreshToken: string) => {
     return { message: "Logged out successfully" };
 }
 
+export const getCurrentUser = async (userId: string) => {
+    const user = await findUserProfileById(userId);
+    if (!user) {
+        throw Object.assign(new Error("User profile not found"), { statusCode: 404 });
+    }
+    return user;
+}
+
+export const forgotPassword = async (email: string) => {
+    const message = "If an account with that email exists, a password reset link has been sent.";
+    // STEP 1: Generate secure reset token
+    const { token, tokenHash } = generateVerificationToken();
+
+    // STEP 2: Set token expiry (15 minutes)
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    // STEP 3: Save hashed token in database
+    const user = await savePasswordResetToken(email, tokenHash, expiresAt);
+
+    // STEP 4: Prevent email enumeration
+    if (!user) { return { message }; }
+
+    // STEP 5: Generate reset URL
+    const resetUrl = new URL("/reset-password", process.env.CLIENT_URI);
+    resetUrl.searchParams.set("token", token);
+
+    // STEP 6: Send reset email
+    try {
+        await sendEmail({
+            to: user.email,
+            subject: "Reset Your Zeno Password",
+            html: `
+                <h2>Password Reset</h2>
+                <p>We received a request to reset your Zeno password.</p>
+                <p>Click below to reset your password.</p>
+
+                <a href="${resetUrl.toString()}">
+                    Reset Password
+                </a>
+
+                <p>This link expires in 15 minutes.</p>
+                <p>If you did not request this, you can safely ignore this email.</p>
+            `,
+        });
+    } catch (error) {
+        console.error("Password reset email failed:", error);
+        try {
+            await clearPasswordResetToken(user.id, tokenHash);
+        } catch (cleanupError) {
+            console.error(
+                "Failed to clear password reset token:",
+                cleanupError
+            );
+        }
+    }
+
+    // STEP 7: Always return the same response
+    return { message };
+}
+
+export const resetPassword = async (token: string, newPassword: string) => {
+    // STEP 1: Hash the received reset token
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+
+    // STEP 2: Hash the new password
+    const newPasswordHash = await hashPassword(newPassword);
+
+    // STEP 3: Atomically validate token and update password
+    const user = await resetPasswordByTokenHash(tokenHash, newPasswordHash);
+
+    // STEP 4: Reject invalid, expired, or already-used tokens
+    if (!user) {
+        return { success: false as const, message: "Invalid or expired password reset link." };
+    }
+
+    // STEP 5: Return success
+    return {
+        success: true as const,
+        message: "Your password has been reset successfully.",
+    };
+};
+
+export const changePassword = async (userId: string, currentPassword: string, newPassword: string) => {
+    // 1. Find user
+    const user = await findUserForPasswordChange(userId);
+    if (!user) {
+        throw Object.assign(new Error("User not found."), { statusCode: 404, });
+    }
+
+    // STEP 2: Verify current password
+    const isPasswordValid = await comparePassword(currentPassword, user.passwordHash);
+    if (!isPasswordValid) {
+        throw Object.assign(new Error("Current password is incorrect."), { statusCode: 400, });
+    }
+
+    // STEP 3: Hash new password
+    const newPasswordHash = await hashPassword(newPassword);
+
+    // STEP 4: Update password and invalidate refresh session
+    const updatedUser = await changePasswordByUserId(userId, user.passwordHash, newPasswordHash);
+
+    if (!updatedUser) {
+        throw Object.assign(new Error("Unable to change password. Please try again."), { statusCode: 409, });
+    }
+
+    return {
+        message: "Password changed successfully.",
+    };
+};
+
+
+
 // Rate limit and hash cost: The registration limiter now runs before validation, which is good. It uses an in-memory store, so multiple server instances will need a shared store. SALT_ROUNDS = 10 is a cost setting, not a length limit; benchmark it under realistic load before deciding whether to change it.
-// JWT verification: token.utils.ts casts verified JWT data to TokenPayload without checking its runtime shape. Validate required claims, and configure the expected algorithm, issuer, and audience.
-// const payload = jwt.verify(token, secret, {
-//     algorithms: ["HS256"],
-//     issuer: "your-app",
-//     audience: "your-api",
-// });
-
-// if (
-//     typeof payload !== "object" ||
-//     payload === null ||
-//     typeof payload.userId !== "string" ||
-//     payload.userId.length === 0
-// ) {
-//     throw new Error("Invalid token payload");
-// }
-
-// return { userId: payload.userId };
 
 // Redis Rate Limiter
 // Multi Device Session Management
-// Refresh Token Rotation
 // Check Window Functions, Aggregate Queries, and Indexes for Performance
 // Views and materialized views.
 // Microservices and Event-Driven Architecture

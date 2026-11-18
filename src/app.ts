@@ -10,6 +10,7 @@ import morgan from "morgan";
 import healthRoutes from "./routes/health.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import errorHandler from "./middlewares/error.middleware.js";
+import { responseMiddleware } from "./middlewares/response.middleware.js";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use(responseMiddleware);
 
 // API routes
 app.use("/api/health", healthRoutes);

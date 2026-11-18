@@ -5,7 +5,11 @@ import {
     resendVerificationEmail,
     loginUser,
     refreshUserToken,
-    logoutUser
+    logoutUser,
+    getCurrentUser,
+    forgotPassword,
+    resetPassword,
+    changePassword,
 } from "../services/auth.service.js";
 import { clearAuthCookies, setAuthCookies } from "../utils/cookies.utils.js";
 
@@ -96,3 +100,59 @@ export const LogoutController = async (req: Request, res: Response, next: NextFu
         next(error);
     }
 }
+
+export const getCurrentUserController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const userId = req.user!.userId;
+        const user = await getCurrentUser(userId);
+
+        res.status(200).json({
+            success: true,
+            message: "User profile retrieved successfully",
+            user,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export const forgotPasswordController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { email } = req.body;
+        const result = await forgotPassword(email);
+        res.status(200).json({ success: true, message: result.message })
+    } catch (error) {
+        next(error);
+    }
+}
+
+// =============== Reset Password Controller ===============
+export const resetPasswordController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { token, password } = req.body;
+        const result = await resetPassword(token, password);
+
+        if (!result.success) {
+            res.status(400).json({ success: false, message: result.message, });
+            return;
+        }
+        clearAuthCookies(res);   // Clear existing authentication cookies
+        res.status(200).json({ success: true, message: result.message, });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const changePasswordController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const result = await changePassword(req.user!.userId, req.body.currentPassword, req.body.newPassword);
+        clearAuthCookies(res);
+
+        res.status(200).json({
+            success: true,
+            message: result.message,
+        });
+    } catch (error) {
+        next(error);
+    }
+};

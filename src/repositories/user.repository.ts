@@ -179,18 +179,123 @@ export const revokeRefreshToken = async (tokenHash: string) => {
     return user;
 };
 
-export const findUserByUsername = async (userName: string) => {
-    const normalizedUsername = userName.trim().toLowerCase();
-    const [user] = await db.select().from(users).where(
-        and(sql`lower(${users.userName}) = ${normalizedUsername}`, isNull(users.deletedAt),
-        )).limit(1);
+export const findActiveUserById = async (userId: string) => {
+    const [user] = await db.select({
+        id: users.id,
+        email: users.email,
+        userName: users.userName,
+        displayName: users.displayName,
+        isActive: users.isActive,
+        isEmailVerified: users.isEmailVerified,
+    }).from(users).where(and(
+        eq(users.id, userId),
+        eq(users.isActive, true),
+        eq(users.isEmailVerified, true),
+        isNull(users.deletedAt),
+    )).limit(1);
+
     return user;
 };
 
-// Find a user by their ID Used for the sending verification email and verifying the email token
-export const findUserById = async (id: string) => {
-    const [user] = await db.select().from(users)
-        .where(and(eq(users.id, id), isNull(users.deletedAt),),)
-        .limit(1);
+export const findUserProfileById = async (userId: string) => {
+    const [user] = await db.select({
+        id: users.id,
+        email: users.email,
+        userName: users.userName,
+        displayName: users.displayName,
+        about: users.about,
+        avatarKey: users.avatarKey,
+        isEmailVerified: users.isEmailVerified,
+        createdAt: users.createdAt,
+    }).from(users).where(and(
+        eq(users.id, userId),
+        eq(users.isActive, true),
+        eq(users.isEmailVerified, true),
+        isNull(users.deletedAt)
+    )).limit(1);
+
     return user;
+};
+
+export const savePasswordResetToken = async (email: string, tokenHash: string, expiresAt: Date) => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const [user] = await db.update(users).set({
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpires: expiresAt,
+        updatedAt: new Date(),
+    }).where(and(
+        sql`lower(${users.email}) = ${normalizedEmail}`,
+        eq(users.isActive, true),
+        eq(users.isEmailVerified, true),
+        isNull(users.deletedAt),
+    )).returning({ id: users.id, email: users.email });
+
+    return user;
+};
+
+export const clearPasswordResetToken = async (userId: string, tokenHash: string): Promise<void> => {
+    await db.update(users).set({
+        passwordResetTokenHash: null,
+        passwordResetExpires: null,
+        updatedAt: new Date(),
+    }).where(and(
+        eq(users.id, userId),
+        eq(users.passwordResetTokenHash, tokenHash),
+    ));
+};
+
+export const resetPasswordByTokenHash = async (tokenHash: string, newPasswordHash: string) => {
+    const now = new Date();
+
+    const [user] = await db.update(users).set({
+        passwordHash: newPasswordHash,    // Consume the reset token
+        passwordResetTokenHash: null,
+        passwordResetExpires: null,
+        refreshTokenHash: null,          // Invalidate the stored refresh-token session
+        loginAttempts: 0,                // Reset failed-login state
+        lockUntil: null,
+        lastPasswordChangedAt: now,
+        updatedAt: now,
+    }).where(and(
+        eq(users.passwordResetTokenHash, tokenHash),
+        gt(users.passwordResetExpires, now),
+        eq(users.isActive, true),
+        isNull(users.deletedAt),
+    )).returning({ id: users.id, });
+
+    return user ?? null;
+};
+
+export const changePasswordByUserId = async (userId: string, currentPasswordHash: string, newPasswordHash: string) => {
+    const now = new Date();
+
+    const [user] = await db.update(users).set({
+        passwordHash: newPasswordHash,
+        refreshTokenHash: null,
+        loginAttempts: 0,
+        lockUntil: null,
+        lastPasswordChangedAt: now,
+        updatedAt: now,
+    }).where(and(
+        eq(users.id, userId),
+        eq(users.passwordHash, currentPasswordHash),
+        eq(users.isActive, true),
+        isNull(users.deletedAt),
+    )).returning({ id: users.id, });
+
+    return user ?? null;
+};
+
+export const findUserForPasswordChange = async (userId: string) => {
+    const [user] = await db.select({
+        id: users.id,
+        passwordHash: users.passwordHash,
+    }).from(users).where(and(
+        eq(users.id, userId),
+        eq(users.isActive, true),
+        isNull(users.deletedAt),
+    )).limit(1);
+
+    return user ?? null;
 };

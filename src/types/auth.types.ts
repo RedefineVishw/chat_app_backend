@@ -4,3 +4,4 @@ export interface RegisterInput {
     userName: string;
     displayName: string;
 }
+
