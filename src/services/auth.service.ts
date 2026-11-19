@@ -1,9 +1,8 @@
 import { createHash } from "crypto";
-import { type RegisterInput } from "../types/auth.types.js";
-
+import { type RegisterInput } from "../types/user.types.js";
 import { comparePassword, hashPassword } from "../utils/password.utils.js";
-
 import sendEmail from "../utils/email.utils.js";
+
 import {
     generateAccessToken,
     generateRefreshToken,

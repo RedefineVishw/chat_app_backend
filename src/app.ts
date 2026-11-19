@@ -9,6 +9,7 @@ import morgan from "morgan";
 // Routes and middleware
 import healthRoutes from "./routes/health.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import userRoutes from "./routes/user.routes.js";
 import errorHandler from "./middlewares/error.middleware.js";
 import { responseMiddleware } from "./middlewares/response.middleware.js";
 
@@ -30,6 +31,7 @@ app.use(responseMiddleware);
 // API routes
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/user", userRoutes);
 
 // 404 handler
 app.use((_req, res) => {

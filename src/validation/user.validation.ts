@@ -40,3 +40,17 @@ export const changePasswordSchema = z.object({
         path: ["newPassword"],
     }
 );
+
+// ============= Update User Profile Schema =============
+export const updateUserProfileSchema = z.object({
+    userName: z.string().trim().min(1, "Username cannot be empty")
+        .max(30, "Username cannot exceed 30 characters").optional(),
+
+    displayName: z.string().trim().min(1, "Display name cannot be empty")
+        .max(50, "Display name cannot exceed 50 characters").optional(),
+
+    about: z.string().trim().max(180, "About cannot exceed 180 characters")
+        .nullable().optional(),
+}).strict().refine(
+    (data) => Object.keys(data).length > 0, { message: "At least one profile field must be provided" }
+);

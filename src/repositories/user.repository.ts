@@ -1,6 +1,7 @@
 import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { db } from "../config/database.js";
 import { users } from "../db/user.schema.js";
+import type { UpdateUserProfile } from "../types/user.types.js";
 
 // Check if the error is a unique constraint violation (PostgreSQL error code 23505)
 export const findRegistrationConflicts = async (email: string, userName: string) => {
@@ -296,6 +297,73 @@ export const findUserForPasswordChange = async (userId: string) => {
         eq(users.isActive, true),
         isNull(users.deletedAt),
     )).limit(1);
+
+    return user ?? null;
+};
+
+
+// Update user profile
+export const updateUserProfile = async (userId: string, data: UpdateUserProfile) => {
+    const [user] = await db.update(users).set({ ...data, updatedAt: new Date() })
+        .where(and(
+            eq(users.id, userId),
+            eq(users.isActive, true),
+            eq(users.isEmailVerified, true),
+            isNull(users.deletedAt),
+        ))
+        .returning({
+            id: users.id,
+            email: users.email,
+            userName: users.userName,
+            displayName: users.displayName,
+            about: users.about,
+            avatarKey: users.avatarKey,
+            updatedAt: users.updatedAt,
+        });
+
+    return user ?? null;
+};
+
+// Find a public user profile by username
+export const findPublicUserProfileByUsername = async (userName: string) => {
+    const normalizedUsername = userName.trim().toLowerCase();
+
+    const [user] = await db.select({
+        userName: users.userName,
+        displayName: users.displayName,
+        about: users.about,
+        avatarKey: users.avatarKey,
+        createdAt: users.createdAt,
+    }).from(users).where(and(
+        sql`lower(${users.userName}) = ${normalizedUsername}`,
+        eq(users.isActive, true),
+        eq(users.isEmailVerified, true),
+        isNull(users.deletedAt),
+    )).limit(1);
+
+    return user ?? null;
+};
+
+export const updateUserAvatar = async (userId: string, avatarKey: string | null) => {
+    const [user] = await db.update(users).set({ avatarKey, updatedAt: new Date() })
+        .where(and(
+            eq(users.id, userId),
+            eq(users.isActive, true),
+            eq(users.isEmailVerified, true),
+            isNull(users.deletedAt),
+        ))
+        .returning({ avatarKey: users.avatarKey });
+    return user ?? null;
+};
+
+export const findUserAvatarKeyById = async (userId: string) => {
+    const [user] = await db.select({ avatarKey: users.avatarKey })
+        .from(users).where(and(
+            eq(users.id, userId),
+            eq(users.isActive, true),
+            eq(users.isEmailVerified, true),
+            isNull(users.deletedAt),
+        )).limit(1);
 
     return user ?? null;
 };
