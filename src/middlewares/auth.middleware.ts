@@ -1,7 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
-import { success, z } from "zod";
+import { z } from "zod";
 import { verifyAccessToken } from "../utils/token.utils.js";
 import { findActiveUserById } from "../repositories/user.repository.js";
+import jwt from "jsonwebtoken";
 
 export const authenticateUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -37,9 +38,18 @@ export const authenticateUser = async (req: Request, res: Response, next: NextFu
 
         next();
     } catch (error) {
-        res.status(401).json({
-            success: false,
-            message: "Invalid or expired token",
-        });
+        if (
+            error instanceof jwt.TokenExpiredError ||
+            error instanceof jwt.JsonWebTokenError ||
+            error instanceof jwt.NotBeforeError
+        ) {
+            res.status(401).json({
+                success: false,
+                message: "Invalid or expired token",
+            });
+            return;
+        }
+
+        next(error);
     }
 };

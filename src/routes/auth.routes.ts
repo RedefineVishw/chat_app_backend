@@ -1,5 +1,5 @@
 import { Router } from "express";
-import authLimiter from "../middlewares/rateLimiter.middleware.js";
+import { authLimiter, loginLimiter, sensitiveAuthLimiter } from "../middlewares/rateLimiter.middleware.js";
 import validate from "../middlewares/validate.middleware.js";
 import { authenticateUser } from "../middlewares/auth.middleware.js"
 
@@ -28,16 +28,16 @@ import {
 const router = Router();
 
 router.post("/register", authLimiter, validate(registerUserSchema), registerController);
-router.post("/verify-email", authLimiter, validate(verifyEmailSchema), verifyEmailController);
-router.post("/resend-verification-email", authLimiter, validate(resendVerificationEmailSchema), resendVerificationEmailController);
-router.post("/login", authLimiter, validate(loginUserSchema), LoginController);
+router.post("/verify-email", sensitiveAuthLimiter, validate(verifyEmailSchema), verifyEmailController);
+router.post("/resend-verification-email", sensitiveAuthLimiter, validate(resendVerificationEmailSchema), resendVerificationEmailController);
+router.post("/login", loginLimiter, validate(loginUserSchema), LoginController);
 router.post("/refresh", authLimiter, RefreshTokenController);
 router.post("/logout", authLimiter, LogoutController)
 
-router.post("/forgot-password", authLimiter, validate(forgotPasswordSchema), forgotPasswordController);
-router.post("/reset-password", authLimiter, validate(verifyResetPasswordSchema), resetPasswordController)
-router.patch("/change-password", authLimiter, authenticateUser, validate(changePasswordSchema), changePasswordController);
+router.post("/forgot-password", sensitiveAuthLimiter, validate(forgotPasswordSchema), forgotPasswordController);
+router.post("/reset-password", sensitiveAuthLimiter, validate(verifyResetPasswordSchema), resetPasswordController)
+router.patch("/change-password", sensitiveAuthLimiter, authenticateUser, validate(changePasswordSchema), changePasswordController);
 
-router.get("/me", authLimiter, authenticateUser, getCurrentUserController);
+router.get("/me", authenticateUser, getCurrentUserController);
 
 export default router;

@@ -407,3 +407,33 @@ export const changePassword = async (userId: string, currentPassword: string, ne
 // WebSockets, Socket.IO, SSE
 // Load Balancing, Clustering, Horizontal Scaling
 // CSRF, SSRF, XSS, SQL Injection, NoSQL Injection, Command Injection, Path Traversal, Open Redirects, Clickjacking, Security Headers, CORS Misconfigurations, Insecure Deserialization, Insecure Direct Object References (IDOR), Broken Authentication and Session Management, Insufficient Logging and Monitoring
+
+// Phase 2 — User Profile
+// Update profile information
+// Change username
+// Update display name and about
+// Upload/change avatar
+// Account deactivation/deletion
+
+// Phase 3 — User Discovery
+// Search users by username
+// Get user profiles
+// Pagination and filtering
+
+// Phase 4 — Chat System
+
+// Conversations and participants
+// Send and receive messages
+// Message persistence
+// WebSockets and connection management
+
+// Phase 5 — Advanced Backend
+// Cassandra integration for message storage
+// Redis caching and presence
+// Message delivery/read receipts
+// Background jobs and notifications
+
+// Phase 6 — Production Readiness
+// Security and rate-limit review
+// Logging and monitoring
+// Testing and deployment
