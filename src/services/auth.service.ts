@@ -407,20 +407,18 @@ export const changePassword = async (userId: string, currentPassword: string, ne
 // Load Balancing, Clustering, Horizontal Scaling
 // CSRF, SSRF, XSS, SQL Injection, NoSQL Injection, Command Injection, Path Traversal, Open Redirects, Clickjacking, Security Headers, CORS Misconfigurations, Insecure Deserialization, Insecure Direct Object References (IDOR), Broken Authentication and Session Management, Insufficient Logging and Monitoring
 
-// Phase 2 — User Profile
-// Update profile information
-// Change username
-// Update display name and about
-// Upload/change avatar
-// Account deactivation/deletion
 
-// Phase 3 — User Discovery
-// Search users by username
-// Get user profiles
-// Pagination and filtering
+// Phase 4 — Contact / Friend Management
+// 1. Send a connection request.
+// 2. Accept a connection request.
+// 3. Reject a connection request.
+// 4. Cancel an outgoing request.
+// 5. Remove an existing connection.
+// 6. List incoming and outgoing requests.
+// 7. List connected users.
+// 8. Prevent duplicate requests and self-requests.
 
 // Phase 4 — Chat System
-
 // Conversations and participants
 // Send and receive messages
 // Message persistence

@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { deleteAvatarService, getPublicUserProfileService, updateUserProfileService, uploadAvatarService } from "../services/user.service.js";
+import { deleteAvatarService, getPublicUserProfileService, searchUsersService, updateUserProfileService, uploadAvatarService } from "../services/user.service.js";
 
 export const updateUserProfileController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -51,6 +51,20 @@ export const deleteAvatarController = async (req: Request, res: Response, next: 
             message: "Avatar removed successfully",
             avatarKey: user.avatarKey,
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const searchUsersController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { q, page, limit } = res.locals.validatedData;
+        if (typeof q !== "string" || typeof page !== "number" || typeof limit !== "number") {
+            res.status(400).json({ success: false, message: "Invalid search parameters", });
+            return;
+        }
+        const result = await searchUsersService({ query: q, page, limit, excludeUserId: req.user!.userId, });
+        res.status(200).json({ success: true, ...result, });
     } catch (error) {
         next(error);
     }

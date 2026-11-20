@@ -31,3 +31,21 @@ export const deleteAvatarFromCloudinary = async (publicId: string): Promise<void
         throw new Error("Failed to delete avatar from Cloudinary");
     }
 };
+
+export const getAvatarUrl = (publicId: string | null) => {
+    if (!publicId) { return null; }
+
+    return cloudinary.url(publicId, {
+        secure: true,
+        transformation: [
+            {
+                width: 512,
+                height: 512,
+                crop: "fill",
+                gravity: "face",
+                quality: "auto",
+                fetch_format: "auto",
+            },
+        ],
+    });
+};

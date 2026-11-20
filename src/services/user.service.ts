@@ -1,6 +1,6 @@
-import { findPublicUserProfileByUsername, findUserAvatarKeyById, updateUserAvatar, updateUserProfile } from "../repositories/user.repository.js";
-import type { UpdateUserProfile } from "../types/user.types.js";
-import { deleteAvatarFromCloudinary, uploadAvatarToCloudinary } from "../utils/cloudinary.utils.js";
+import { findPublicUserProfileByUsername, findUserAvatarKeyById, searchUsers, updateUserAvatar, updateUserProfile } from "../repositories/user.repository.js";
+import type { SearchUsersParams, UpdateUserProfile } from "../types/user.types.js";
+import { deleteAvatarFromCloudinary, getAvatarUrl, uploadAvatarToCloudinary } from "../utils/cloudinary.utils.js";
 import { processAvatarImage } from "../utils/image.utils.js";
 
 export const updateUserProfileService = async (userId: string, data: UpdateUserProfile) => {
@@ -25,7 +25,10 @@ export const getPublicUserProfileService = async (userName: string) => {
     if (!user) {
         throw Object.assign(new Error("User not found"), { statusCode: 404 });
     }
-    return user;
+    return {
+        ...user,
+        avatarUrl: getAvatarUrl(user.avatarKey),
+    };
 };
 
 export const uploadAvatarService = async (userId: string, buffer: Buffer) => {
@@ -93,4 +96,24 @@ export const deleteAvatarService = async (userId: string) => {
     }
 
     return updatedUser;
+};
+
+export const searchUsersService = async (data: SearchUsersParams) => {
+    const { users, total } = await searchUsers(data);
+
+    return {
+        users: users.map((user) => ({
+            userName: user.userName,
+            displayName: user.displayName,
+            about: user.about,
+            avatarUrl: getAvatarUrl(user.avatarKey),
+        })),
+
+        pagination: {
+            page: data.page,
+            limit: data.limit,
+            total,
+            totalPages: Math.ceil(total / data.limit),
+        },
+    };
 };

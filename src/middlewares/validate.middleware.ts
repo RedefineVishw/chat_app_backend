@@ -1,9 +1,11 @@
 import type { NextFunction, Request, Response } from "express";
 import type { z } from "zod";
 
-const validate = (schema: z.ZodType) =>
+type RequestSource = "body" | "query" | "params";
+
+const validate = (schema: z.ZodType, source: RequestSource = "body") =>
     (req: Request, res: Response, next: NextFunction): void => {
-        const result = schema.safeParse(req.body);
+        const result = schema.safeParse(req[source]);
 
         if (!result.success) {
             res.status(400).json({
@@ -18,7 +20,12 @@ const validate = (schema: z.ZodType) =>
 
             return;
         }
-        req.body = result.data;
+
+        if (source === "body") {
+            req.body = result.data;
+        } else {
+            res.locals.validatedData = result.data;
+        }
         next();
     };
 

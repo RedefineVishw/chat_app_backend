@@ -7,7 +7,14 @@ export interface RegisterInput {
 
 
 export interface UpdateUserProfile {
-        userName?: string;
-        displayName?: string;
-        about?: string | null;
+    userName?: string;
+    displayName?: string;
+    about?: string | null;
+}
+
+export interface SearchUsersParams {
+    query: string;
+    page: number;
+    limit: number;
+    excludeUserId: string;
 }

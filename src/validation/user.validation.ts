@@ -54,3 +54,10 @@ export const updateUserProfileSchema = z.object({
 }).strict().refine(
     (data) => Object.keys(data).length > 0, { message: "At least one profile field must be provided" }
 );
+
+// =========== Search User Schema ===============
+export const searchUsersSchema = z.object({
+    q: z.string().trim().min(1, "Search query is required").max(100),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(20).default(20),
+}).strict();

@@ -1,7 +1,7 @@
-import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, count, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { db } from "../config/database.js";
 import { users } from "../db/user.schema.js";
-import type { UpdateUserProfile } from "../types/user.types.js";
+import type { SearchUsersParams, UpdateUserProfile } from "../types/user.types.js";
 
 // Check if the error is a unique constraint violation (PostgreSQL error code 23505)
 export const findRegistrationConflicts = async (email: string, userName: string) => {
@@ -366,4 +366,42 @@ export const findUserAvatarKeyById = async (userId: string) => {
         )).limit(1);
 
     return user ?? null;
+};
+
+
+export const searchUsers = async (data: SearchUsersParams) => {
+    const normalizedQuery = data.query.trim().toLowerCase();
+
+    // Escape SQL LIKE wildcard characters so they are treated literally.
+    const escapedQuery = normalizedQuery.replace(/[\\%_]/g, "\\$&");
+    const searchPattern = `%${escapedQuery}%`;
+
+    const conditions = and(or(
+        sql`${users.userName} ILIKE ${searchPattern}`,
+        sql`${users.displayName} ILIKE ${searchPattern}`,
+        sql`${users.email} ILIKE ${searchPattern}`,
+    ), eq(users.isActive, true),
+        eq(users.isEmailVerified, true),
+        isNull(users.deletedAt),
+        sql`${users.id} <> ${data.excludeUserId}`,
+    );
+
+    const offset = (data.page - 1) * data.limit;
+    const [results, totalResult] = await Promise.all([
+        db.select({
+            userName: users.userName,
+            displayName: users.displayName,
+            about: users.about,
+            avatarKey: users.avatarKey,
+        }).from(users).where(conditions)
+            .orderBy(users.userName)
+            .limit(data.limit)
+            .offset(offset),
+        db.select({ total: count() }).from(users).where(conditions),
+    ]);
+
+    return {
+        users: results,
+        total: totalResult[0]?.total ?? 0,
+    };
 };
