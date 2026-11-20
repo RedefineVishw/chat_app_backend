@@ -1,7 +1,6 @@
 
 import type { UserConnection, NewUserConnection, } from "../db/connection.schema.js";
 import type { UserBlock, NewUserBlock } from "../db/block.schema.js";
-import type { ConnectionRejection, NewConnectionRejection } from "../db/connection-rejection.schema.js";
 
 // Connection status
 export type ConnectionStatus = UserConnection["status"];
@@ -16,15 +15,15 @@ export type {
     UserBlock, NewUserBlock,
 };
 
-// Rejection tracking types
-export type {
-    ConnectionRejection, NewConnectionRejection,
-};
-
 // Send connection request
 export interface SendConnectionRequestParams {
     requesterId: string;
     addresseeId: string;
+}
+
+export interface AcceptConnectionRequestParams {
+    connectionId: string;
+    userId: string;
 }
 
 // Connection action parameters

@@ -1,6 +1,6 @@
 import { and, count, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { db } from "../config/database.js";
-import type { SendConnectionRequestParams } from "../types/connection.types.js";
+import type { SendConnectionRequestParams, AcceptConnectionRequestParams } from "../types/connection.types.js";
 import { userBlocks } from "../db/block.schema.js";
 import { userConnections } from "../db/connection.schema.js";
 
@@ -66,4 +66,18 @@ export const createConnectionRequest = async ({ requesterId, addresseeId }: Send
             connection,
         };
     });
+};
+
+export const acceptConnectionRequest = async ({ connectionId, userId }: AcceptConnectionRequestParams) => {
+    const [connection] = await db.update(userConnections).set({
+        status: "accepted",
+        acceptedAt: new Date(),
+        updatedAt: new Date(),
+    }).where(and(
+        eq(userConnections.id, connectionId),
+        eq(userConnections.addresseeId, userId),
+        eq(userConnections.status, "pending"),
+    )).returning();
+
+    return connection ?? null;
 };

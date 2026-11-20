@@ -1,9 +1,10 @@
 import {
+    acceptConnectionRequest,
     createConnectionRequest,
     hasBlockBetweenUsers,
 } from "../repositories/connection.repository.js";
 
-import type { SendConnectionRequestParams } from "../types/connection.types.js";
+import type { AcceptConnectionRequestParams, SendConnectionRequestParams } from "../types/connection.types.js";
 
 export const sendConnectionRequestService = async ({ requesterId, addresseeId }: SendConnectionRequestParams) => {
     // Prevent sending a request to yourself
@@ -33,4 +34,14 @@ export const sendConnectionRequestService = async ({ requesterId, addresseeId }:
         case "created":
             return result.connection;
     }
+};
+
+export const acceptConnectionRequestService = async ({ connectionId, userId }: AcceptConnectionRequestParams) => {
+    const connection = await acceptConnectionRequest({ connectionId, userId });
+
+    if (!connection) {
+        throw new Error("Connection request not found or you are not authorized to accept it");
+    }
+
+    return connection;
 };
